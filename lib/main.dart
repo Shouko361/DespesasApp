@@ -1,8 +1,10 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'models/transaction.dart';
+import 'components/chart.dart';
 import 'components/transaction_form.dart';
 import 'components/transaction_list.dart';
-import 'models/transaction.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 void main(List<String> args) {
   runApp(const DespesaApp());
@@ -16,6 +18,12 @@ class DespesaApp extends StatelessWidget {
     final themeData = ThemeData();
 
     return MaterialApp(
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: [Locale('pt', 'BR')],
       debugShowCheckedModeBanner: false,
       home: const MyHomePage(),
       theme: themeData.copyWith(
@@ -53,27 +61,46 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final List<Transaction> _transaction = [];
 
-  _addTransaction(String title, double value) {
+  List<Transaction> get _recentTransactions {
+    return _transaction.where((tr) {
+      return tr.date.isAfter(
+        DateTime.now().subtract(
+          Duration(days: 7),
+        ),
+      );
+    }).toList();
+  }
+
+  _addTransaction(String title, double value, DateTime date) {
     final newTransaction = Transaction(
       id: Random().nextDouble().toString(),
       title: title,
       value: value,
-      date: DateTime.now(),
+      date: date,
     );
 
-    setState(() {
-      _transaction.add(newTransaction);
-    });
+    setState(
+      () {
+        _transaction.add(newTransaction);
+      },
+    );
 
     Navigator.of(context).pop();
   }
 
+  _delTransaction(String id) {
+    setState(() {
+      _transaction.removeWhere((tr) => tr.id == id);
+    });
+  }
+
   _openTransactionForm(BuildContext context) {
     showModalBottomSheet(
-        context: context,
-        builder: (_) {
-          return TransactionForm(_addTransaction);
-        });
+      context: context,
+      builder: (_) {
+        return TransactionForm(_addTransaction);
+      },
+    );
   }
 
   @override
@@ -99,14 +126,20 @@ class _MyHomePageState extends State<MyHomePage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Container(
-              child: const Card(
-                color: Colors.blue,
-                elevation: 5,
-                child: Text('Grafico'),
+              margin: const EdgeInsets.only(top: 15.0),
+              child: const Text(
+                'Grafico Semanal',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20.0,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
+            Chart(_recentTransactions),
             TransactionList(
               _transaction,
+              _delTransaction,
             ),
           ],
         ),
