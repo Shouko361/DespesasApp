@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'models/transaction.dart';
@@ -18,12 +19,12 @@ class DespesaApp extends StatelessWidget {
     final themeData = ThemeData();
 
     return MaterialApp(
-      localizationsDelegates: [
+      localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: [Locale('pt', 'BR')],
+      supportedLocales: const [Locale('pt', 'BR')],
       debugShowCheckedModeBanner: false,
       home: const MyHomePage(),
       theme: themeData.copyWith(
@@ -60,12 +61,13 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final List<Transaction> _transaction = [];
+  bool _showChart = false;
 
   List<Transaction> get _recentTransactions {
     return _transaction.where((tr) {
       return tr.date.isAfter(
         DateTime.now().subtract(
-          Duration(days: 7),
+          const Duration(days: 7),
         ),
       );
     }).toList();
@@ -96,51 +98,94 @@ class _MyHomePageState extends State<MyHomePage> {
 
   _openTransactionForm(BuildContext context) {
     showModalBottomSheet(
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(30.0),
+          topRight: Radius.circular(30.0),
+        ),
+      ),
       context: context,
+      isScrollControlled: true,
       builder: (_) {
-        return TransactionForm(_addTransaction);
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: TransactionForm(_addTransaction),
+        );
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Center(
-          child: Text('Minhas Despesas'),
-        ),
-        actions: [
+    final mediaQuery = MediaQuery.of(context);
+    bool isLandScape = mediaQuery.orientation == Orientation.landscape;
+
+    final appBar = AppBar(
+      title: const Center(
+        child: Text('Minhas Despesas'),
+      ),
+      actions: [
+        if (isLandScape)
           IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _openTransactionForm(context),
-          )
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openTransactionForm(context),
-        child: const Icon(Icons.add),
-      ),
+            icon: Icon(_showChart ? Icons.list : Icons.bar_chart_outlined),
+            onPressed: () {
+              setState(() {
+                _showChart = !_showChart;
+              });
+            },
+          ),
+        IconButton(
+          icon: const Icon(Icons.add),
+          onPressed: () => _openTransactionForm(context),
+        ),
+      ],
+    );
+
+    final availableHeight = mediaQuery.size.height -
+        appBar.preferredSize.height -
+        mediaQuery.padding.top;
+
+    return Scaffold(
+      appBar: appBar,
+      floatingActionButton: Platform.isIOS
+          ? Container()
+          : FloatingActionButton(
+              onPressed: () => _openTransactionForm(context),
+              child: const Icon(Icons.add),
+            ),
+      floatingActionButtonLocation:
+          FloatingActionButtonLocation.miniCenterFloat,
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            Container(
-              margin: const EdgeInsets.only(top: 15.0),
-              child: const Text(
-                'Grafico Semanal',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20.0,
-                ),
-                textAlign: TextAlign.center,
+            if (_showChart || !isLandScape)
+              Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 15.0),
+                    child: const Text(
+                      'Grafico Semanal',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20.0,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  Container(
+                    height: availableHeight * (isLandScape ? 0.7 : 0.25),
+                    child: Chart(_recentTransactions),
+                  ),
+                ],
               ),
-            ),
-            Chart(_recentTransactions),
-            TransactionList(
-              _transaction,
-              _delTransaction,
-            ),
+            if (!_showChart || !isLandScape)
+              Container(
+                height: availableHeight * (isLandScape ? 1 : 0.70),
+                child: TransactionList(_transaction, _delTransaction),
+              ),
           ],
         ),
       ),
