@@ -1,23 +1,23 @@
-import 'dart:io';
 import 'dart:math';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'models/transaction.dart';
-import 'components/chart.dart';
-import 'components/transaction_form.dart';
-import 'components/transaction_list.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-void main(List<String> args) {
-  runApp(const DespesaApp());
-}
+import './components/transaction_form.dart';
+import './components/transaction_list.dart';
+import './components/chart.dart';
+import './models/transaction.dart';
 
-class DespesaApp extends StatelessWidget {
-  const DespesaApp({Key? key}) : super(key: key);
+main() => runApp(ExpensesApp());
+
+class ExpensesApp extends StatelessWidget {
+  ExpensesApp({Key? key}) : super(key: key);
+  final ThemeData tema = ThemeData();
 
   @override
   Widget build(BuildContext context) {
-    final themeData = ThemeData();
-
     return MaterialApp(
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
@@ -25,25 +25,28 @@ class DespesaApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('pt', 'BR')],
-      debugShowCheckedModeBanner: false,
       home: const MyHomePage(),
-      theme: themeData.copyWith(
-        colorScheme: themeData.colorScheme.copyWith(
+      theme: tema.copyWith(
+        colorScheme: tema.colorScheme.copyWith(
           primary: Colors.purple,
-          secondary: Colors.purple,
+          secondary: Colors.amber,
         ),
-        textTheme: themeData.textTheme.copyWith(
+        textTheme: tema.textTheme.copyWith(
           headline6: const TextStyle(
             fontFamily: 'OpenSans',
-            fontSize: 18.0,
+            fontSize: 18,
             fontWeight: FontWeight.bold,
             color: Colors.black,
+          ),
+          button: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
           ),
         ),
         appBarTheme: const AppBarTheme(
           titleTextStyle: TextStyle(
             fontFamily: 'OpenSans',
-            fontSize: 20.0,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -60,16 +63,14 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final List<Transaction> _transaction = [];
+  final List<Transaction> _transactions = [];
   bool _showChart = false;
 
   List<Transaction> get _recentTransactions {
-    return _transaction.where((tr) {
-      return tr.date.isAfter(
-        DateTime.now().subtract(
-          const Duration(days: 7),
-        ),
-      );
+    return _transactions.where((tr) {
+      return tr.date.isAfter(DateTime.now().subtract(
+        const Duration(days: 7),
+      ));
     }).toList();
   }
 
@@ -81,22 +82,20 @@ class _MyHomePageState extends State<MyHomePage> {
       date: date,
     );
 
-    setState(
-      () {
-        _transaction.add(newTransaction);
-      },
-    );
+    setState(() {
+      _transactions.add(newTransaction);
+    });
 
     Navigator.of(context).pop();
   }
 
-  _delTransaction(String id) {
+  _removeTransaction(String id) {
     setState(() {
-      _transaction.removeWhere((tr) => tr.id == id);
+      _transactions.removeWhere((tr) => tr.id == id);
     });
   }
 
-  _openTransactionForm(BuildContext context) {
+  _openTransactionFormModal(BuildContext context) {
     showModalBottomSheet(
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
@@ -117,78 +116,99 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
+  Widget _getIconButton(IconData icon, Function() fn) {
+    return Platform.isIOS
+        ? GestureDetector(onTap: fn, child: Icon(icon))
+        : IconButton(icon: Icon(icon), onPressed: fn);
+  }
+
   @override
   Widget build(BuildContext context) {
     final mediaQuery = MediaQuery.of(context);
-    bool isLandScape = mediaQuery.orientation == Orientation.landscape;
+    bool isLandscape = mediaQuery.orientation == Orientation.landscape;
 
-    final appBar = AppBar(
-      title: const Center(
-        child: Text('Minhas Despesas'),
-      ),
-      actions: [
-        if (isLandScape)
-          IconButton(
-            icon: Icon(_showChart ? Icons.list : Icons.bar_chart_outlined),
-            onPressed: () {
-              setState(() {
-                _showChart = !_showChart;
-              });
-            },
-          ),
-        IconButton(
-          icon: const Icon(Icons.add),
-          onPressed: () => _openTransactionForm(context),
+    final iconList = Platform.isIOS ? CupertinoIcons.refresh : Icons.list;
+    final chartList =
+        Platform.isIOS ? CupertinoIcons.refresh : Icons.show_chart;
+
+    final actions = [
+      if (isLandscape)
+        _getIconButton(
+          _showChart ? iconList : chartList,
+          () {
+            setState(() {
+              _showChart = !_showChart;
+            });
+          },
         ),
-      ],
+      _getIconButton(
+        Platform.isIOS ? CupertinoIcons.add : Icons.add,
+        () => _openTransactionFormModal(context),
+      ),
+    ];
+
+    final PreferredSizeWidget appBar = AppBar(
+      title: const Text('Despesas Pessoais'),
+      actions: actions,
     );
 
     final availableHeight = mediaQuery.size.height -
         appBar.preferredSize.height -
         mediaQuery.padding.top;
 
-    return Scaffold(
-      appBar: appBar,
-      floatingActionButton: Platform.isIOS
-          ? Container()
-          : FloatingActionButton(
-              onPressed: () => _openTransactionForm(context),
-              child: const Icon(Icons.add),
-            ),
-      floatingActionButtonLocation:
-          FloatingActionButtonLocation.miniCenterFloat,
-      body: SingleChildScrollView(
+    final bodyPage = SafeArea(
+      child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            if (_showChart || !isLandScape)
-              Column(
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 15.0),
-                    child: const Text(
-                      'Grafico Semanal',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20.0,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  Container(
-                    height: availableHeight * (isLandScape ? 0.7 : 0.25),
-                    child: Chart(_recentTransactions),
-                  ),
-                ],
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 15.0),
+              child: const Text(
+                'Grafico Semanal',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20.0,
+                ),
+                textAlign: TextAlign.center,
               ),
-            if (!_showChart || !isLandScape)
-              Container(
-                height: availableHeight * (isLandScape ? 1 : 0.70),
-                child: TransactionList(_transaction, _delTransaction),
+            ),
+            if (_showChart || !isLandscape)
+              SizedBox(
+                height: availableHeight * (isLandscape ? 0.8 : 0.3),
+                child: Chart(_recentTransactions),
+              ),
+            if (!_showChart || !isLandscape)
+              SizedBox(
+                height: availableHeight * (isLandscape ? 1 : 0.7),
+                child: TransactionList(_transactions, _removeTransaction),
               ),
           ],
         ),
       ),
     );
+
+    return Platform.isIOS
+        ? CupertinoPageScaffold(
+            navigationBar: CupertinoNavigationBar(
+              middle: const Text('Despesas Pessoais'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: actions,
+              ),
+            ),
+            child: bodyPage,
+          )
+        : Scaffold(
+            appBar: appBar,
+            body: bodyPage,
+            floatingActionButton: Platform.isIOS
+                ? Container()
+                : FloatingActionButton(
+                    child: const Icon(Icons.add),
+                    onPressed: () => _openTransactionFormModal(context),
+                  ),
+            floatingActionButtonLocation:
+                FloatingActionButtonLocation.centerFloat,
+          );
   }
 }
